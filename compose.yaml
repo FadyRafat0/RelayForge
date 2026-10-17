@@ -1,0 +1,37 @@
+name: relayforge
+
+services:
+  postgres:
+    image: postgres:18-alpine
+    environment:
+      # Local development credentials only. DATABASE_URL must match these.
+      POSTGRES_USER: relayforge
+      POSTGRES_PASSWORD: relayforge_local
+      POSTGRES_DB: relayforge
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U relayforge -d relayforge"]
+      interval: 2s
+      timeout: 3s
+      retries: 15
+      start_period: 5s
+
+  redis:
+    image: redis:8-alpine
+    command: ["redis-server", "--appendonly", "yes", "--appendfsync", "everysec", "--maxmemory-policy", "noeviction"]
+    ports:
+      - "127.0.0.1:6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 2s
+      timeout: 3s
+      retries: 15
+
+volumes:
+  postgres_data:
+  redis_data:

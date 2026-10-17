@@ -1,0 +1,47 @@
+{
+  "name": "relayforge",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "A reliable webhook delivery platform, built incrementally.",
+  "engines": {
+    "node": ">=24 <25"
+  },
+  "scripts": {
+    "dev": "node --env-file=.env --watch --import tsx src/server.ts",
+    "build": "tsc -p tsconfig.json",
+    "start": "node --env-file=.env dist/server.js",
+    "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.test.json",
+    "test": "vitest run",
+    "test:integration": "node --env-file=.env node_modules/vitest/vitest.mjs run --config vitest.integration.config.ts",
+    "db:up": "docker compose up -d --wait postgres",
+    "db:stop": "docker compose stop postgres",
+    "db:migrate": "node --env-file=.env --import tsx src/migrate.ts",
+    "services:up": "docker compose up -d --wait",
+    "redis:stop": "docker compose stop redis",
+    "dispatch:once": "node --env-file=.env --import tsx src/dispatcher.ts --once",
+    "dispatcher": "node --env-file=.env --import tsx src/dispatcher.ts",
+    "worker:once": "node --env-file=.env --import tsx src/worker.ts --once",
+    "worker": "node --env-file=.env --import tsx src/worker.ts",
+    "receiver": "node --env-file=.env --import tsx src/receiver.ts",
+    "leases:recover": "node --env-file=.env --import tsx src/recover-leases.ts",
+    "demo:up": "docker compose -f compose.demo.yaml up -d --build --wait",
+    "demo:stop": "docker compose -f compose.demo.yaml stop",
+    "demo:down": "docker compose -f compose.demo.yaml down",
+    "benchmark": "node benchmarks/run.mjs"
+  },
+  "dependencies": {
+    "fastify": "^5.12.7",
+    "ipaddr.js": "^2.5.0",
+    "pg": "^8.23.1",
+    "pino": "10.4.0",
+    "redis": "^6.3.0"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "@types/pg": "^8.23.1",
+    "tsx": "^4.0.0",
+    "typescript": "^5.0.0",
+    "vitest": "^5.0.4"
+  }
+}

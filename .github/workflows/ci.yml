@@ -1,0 +1,89 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  checks:
+    name: Typecheck, tests and build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+
+    env:
+      CI: 'true'
+      LOG_LEVEL: silent
+      # Disposable CI services only; these are not deployment credentials.
+      DATABASE_URL: postgresql://relayforge:relayforge_ci@127.0.0.1:5432/relayforge_test
+      REDIS_URL: redis://127.0.0.1:6379
+
+    services:
+      postgres:
+        image: postgres:18-alpine
+        env:
+          POSTGRES_USER: relayforge
+          POSTGRES_PASSWORD: relayforge_ci
+          POSTGRES_DB: relayforge_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U relayforge -d relayforge_test"
+          --health-interval 2s
+          --health-timeout 3s
+          --health-retries 15
+          --health-start-period 5s
+      redis:
+        image: redis:8-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 2s
+          --health-timeout 3s
+          --health-retries 15
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - name: Install locked dependencies
+        run: npm ci
+
+      - name: Create local environment file
+        # Job environment variables above override example-file connection URLs.
+        run: cp .env.example .env
+
+      - name: Check TypeScript
+        run: npm run typecheck
+
+      - name: Run fast tests
+        run: npm test
+
+      - name: Apply migrations to fresh PostgreSQL
+        run: npm run db:migrate
+
+      - name: Run PostgreSQL and Redis integration tests
+        run: npm run test:integration
+
+      - name: Build
+        run: npm run build
+
+      - name: Exercise the complete Docker delivery path
+        run: npm run benchmark -- --rate 2 --seconds 2 --output ci-smoke.json

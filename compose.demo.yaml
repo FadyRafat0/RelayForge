@@ -1,0 +1,113 @@
+# Separate project/volumes from compose.yaml; preserves your host-development data.
+name: relayforge-demo
+
+x-app: &app
+  image: relayforge:local
+  build: .
+  init: true
+  restart: unless-stopped
+  read_only: true
+  security_opt: ["no-new-privileges:true"]
+  cap_drop: [ALL]
+  logging:
+    driver: json-file
+    options: { max-size: "10m", max-file: "3" }
+  stop_grace_period: 20s
+  environment: &environment
+    DATABASE_URL: postgresql://relayforge:relayforge_local@postgres:5432/relayforge
+    REDIS_URL: redis://redis:6379
+    LOG_LEVEL: ${DEMO_LOG_LEVEL:-info}
+
+services:
+  postgres:
+    image: postgres:18-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: relayforge
+      POSTGRES_PASSWORD: relayforge_local
+      POSTGRES_DB: relayforge
+    volumes: ["postgres_data:/var/lib/postgresql"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U relayforge -d relayforge"]
+      interval: 2s
+      timeout: 3s
+      retries: 20
+  redis:
+    image: redis:8-alpine
+    restart: unless-stopped
+    command: [redis-server, --appendonly, "yes", --appendfsync, everysec, --maxmemory-policy, noeviction]
+    volumes: ["redis_data:/data"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 2s
+      timeout: 3s
+      retries: 20
+  provision:
+    <<: *app
+    restart: "no"
+    command: [node, dist/demo.js]
+    depends_on:
+      postgres: { condition: service_healthy }
+  api:
+    <<: *app
+    command: [node, dist/server.js]
+    environment:
+      <<: *environment
+      HOST: 0.0.0.0
+    ports: ["127.0.0.1:${DEMO_PORT:-3100}:3000"]
+    depends_on:
+      provision: { condition: service_completed_successfully }
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 2s
+      timeout: 3s
+      retries: 20
+  receiver:
+    <<: *app
+    command: [node, dist/receiver.js]
+    environment:
+      <<: *environment
+      DEMO_RECEIVER_ENDPOINT_ID: 00000000-0000-4000-8000-000000000001
+      RECEIVER_ID: docker-demo
+    depends_on:
+      provision: { condition: service_completed_successfully }
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:8080/').then(r=>process.exit(r.status===404?0:1)).catch(()=>process.exit(1))"]
+      interval: 2s
+      timeout: 3s
+      retries: 20
+  dispatcher:
+    <<: *app
+    command: [node, dist/dispatcher.js]
+    depends_on:
+      provision: { condition: service_completed_successfully }
+      redis: { condition: service_healthy }
+  worker:
+    <<: *app
+    command: [node, dist/worker.js]
+    # Share only the demo receiver's network namespace, so loopback means receiver.
+    # Public destinations still use the normal validated/pinned HTTP sender.
+    network_mode: service:receiver
+    environment:
+      <<: *environment
+      ALLOW_LOOPBACK_ENDPOINTS: "true"
+      WORKER_CONCURRENCY: ${DEMO_WORKER_CONCURRENCY:-4}
+    depends_on:
+      receiver: { condition: service_healthy, restart: true }
+      redis: { condition: service_healthy }
+  k6:
+    image: grafana/k6:1.0.0
+    profiles: [tools]
+    volumes: ["./benchmarks:/bench:ro"]
+    environment:
+      BASE_URL: http://api:3000
+      RUN_ID: ${BENCHMARK_RUN_ID:-manual}
+      RATE: ${BENCHMARK_RATE:-5}
+      DURATION_SECONDS: ${BENCHMARK_SECONDS:-10}
+    command: [run, /bench/ingest.js]
+    depends_on:
+      api: { condition: service_healthy }
+
+volumes:
+  postgres_data:
+  redis_data:
