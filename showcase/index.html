@@ -1,0 +1,366 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta
+      name="description"
+      content="RelayForge: durable webhook delivery with retries, crash recovery, HMAC signatures, and an auditable delivery history. Explore real recorded backend traces and measured results."
+    />
+    <meta name="theme-color" content="#122a30" />
+    <title>RelayForge — Reliable webhook delivery</title>
+    <link rel="icon" type="image/svg+xml" href="./favicon.svg" />
+    <link rel="stylesheet" href="./styles.css" />
+    <script type="module" src="./app.js"></script>
+  </head>
+  <body>
+    <a class="skip" href="#main">Skip to content</a>
+    <aside class="sidebar">
+      <a class="brand" href="#overview"
+        ><img
+          src="./favicon.svg"
+          width="36"
+          height="36"
+          alt=""
+        />RelayForge<span>WEBHOOK INFRASTRUCTURE</span></a
+      >
+      <div class="nav-label">PROJECT EXPLORER</div>
+      <nav aria-label="Main navigation">
+        <a href="#overview" data-view="overview" aria-current="page"
+          ><span aria-hidden="true">◫</span> Overview</a
+        >
+        <a href="#deliveries" data-view="deliveries"
+          ><span aria-hidden="true">↗</span> Delivery explorer</a
+        >
+        <a href="#architecture" data-view="architecture"
+          ><span aria-hidden="true">◇</span> Architecture</a
+        >
+        <a href="#benchmarks" data-view="benchmarks"
+          ><span aria-hidden="true">▥</span> Benchmarks</a
+        >
+      </nav>
+      <div class="sidebar-note">
+        <span class="dot"></span> Recorded backend run
+        <p>
+          Real HTTP requests.<br />Persisted delivery history.<br />No live
+          backend on this site.
+        </p>
+        <span class="recorded-date">Loading recording…</span>
+      </div>
+      <a class="sidebar-source" href="https://github.com/FadyRafat0/RelayForge"
+        >Source code <span aria-hidden="true">↗</span></a
+      >
+    </aside>
+    <div class="workspace">
+      <header class="topbar">
+        <span
+          >RelayForge <span class="slash">/</span>
+          <span id="breadcrumb">Overview</span></span
+        >
+        <div>
+          <span class="tag">PostgreSQL + Redis Streams</span
+          ><a href="https://github.com/FadyRafat0/RelayForge">GitHub ↗</a>
+        </div>
+      </header>
+      <main id="main">
+        <div id="overview-intro">
+          <div class="eyebrow">
+            <span class="dot"></span> RELIABLE WEBHOOK DELIVERY
+          </div>
+          <section class="hero" aria-labelledby="hero-title">
+            <div>
+              <h1 id="hero-title">
+                Reliable webhooks.<br /><span>Visible outcomes.</span>
+              </h1>
+              <p>
+                A payment succeeds. Your customer’s server is down. RelayForge
+                saves the event, retries delivery, and keeps a record of every
+                attempt.
+              </p>
+              <div class="hero-actions">
+                <button class="primary" data-go="deliveries">
+                  Explore delivery traces
+                  <span aria-hidden="true">↗</span></button
+                ><button class="secondary" id="local-button">
+                  Run with Docker <span aria-hidden="true">⌘</span>
+                </button>
+              </div>
+            </div>
+            <div class="contract">
+              <div class="mono contract-label">THE DELIVERY CONTRACT</div>
+              <div class="contract-title">
+                At least once.<br />Accounted for.
+              </div>
+              <p>
+                Durable acceptance. Bounded retries.<br />Explicit failures.
+                Audited recovery.
+              </p>
+              <a href="#architecture"
+                >See the engineering decisions
+                <span aria-hidden="true">→</span></a
+              >
+            </div>
+          </section>
+        </div>
+        <section id="traces-panel" aria-labelledby="traces-title">
+          <div class="stats" id="stats" aria-live="polite">
+            <div class="stat">
+              <span>RECORDING STATUS</span><strong>Loading</strong
+              ><small>Fetching verified trace data</small>
+            </div>
+          </div>
+          <div class="section-heading">
+            <div>
+              <span class="eyebrow">THE DELIVERY LIFECYCLE</span>
+              <h2 id="traces-title">See what happened. And why.</h2>
+            </div>
+            <span class="recording-pill"
+              ><span class="dot"></span> Recorded demonstration</span
+            >
+          </div>
+          <p class="section-description">
+            Select a scenario to inspect its actual attempts. Playback replays
+            the recording in your browser; it does not submit new events.
+          </p>
+          <div id="trace-error" class="error" role="alert" hidden></div>
+          <div class="explorer">
+            <section class="delivery-list" aria-label="Recorded deliveries">
+              <div class="panel-title">
+                Recorded deliveries <span id="case-count">—</span>
+              </div>
+              <div class="table-scroll">
+                <table>
+                  <thead>
+                    <tr>
+                      <th scope="col">SCENARIO / EVENT</th>
+                      <th scope="col">OUTCOME</th>
+                      <th scope="col">TRIES</th>
+                    </tr>
+                  </thead>
+                  <tbody id="delivery-rows"></tbody>
+                </table>
+              </div>
+              <div class="table-footer">
+                HMAC verified by the receiver · History stored in PostgreSQL
+              </div>
+            </section>
+            <section class="inspector" aria-labelledby="detail-title">
+              <div class="panel-title">
+                Attempt history <span id="selected-key">—</span>
+              </div>
+              <div class="detail-header">
+                <h3 id="detail-title">Select a delivery</h3>
+                <span id="detail-status"></span><code id="delivery-id"></code>
+              </div>
+              <ol id="timeline" class="timeline"></ol>
+              <p id="case-explanation" class="case-explanation"></p>
+              <div class="playback">
+                <button class="secondary" id="play-button" disabled>
+                  ▶ Play recorded trace</button
+                ><span id="playback-status" role="status">Recorded data</span>
+              </div>
+              <div class="proof" id="effect-proof"></div>
+            </section>
+          </div>
+          <div class="evidence-strip">
+            <span><b>01</b> Persist before responding</span
+            ><span><b>02</b> Retry without losing identity</span
+            ><span><b>03</b> Keep the failure history</span>
+          </div>
+        </section>
+        <section
+          id="architecture-panel"
+          hidden
+          aria-labelledby="architecture-title"
+        >
+          <div class="eyebrow">ENGINEERING DECISIONS</div>
+          <h1 id="architecture-title">
+            Reliability comes<br />from the handoffs.
+          </h1>
+          <p class="lead">
+            PostgreSQL owns the delivery state. Redis coordinates work. Workers
+            send HTTP requests. Each boundary has a failure case to handle.
+          </p>
+          <div
+            class="architecture-flow"
+            aria-label="Select a component to read its design"
+          >
+            <button data-component="api">
+              01 <b>API</b><small>Accept + persist</small></button
+            ><span aria-hidden="true">→</span
+            ><button data-component="postgres">
+              02 <b>PostgreSQL</b><small>Source of truth</small></button
+            ><span aria-hidden="true">→</span
+            ><button data-component="dispatcher">
+              03 <b>Dispatcher</b><small>Reconcile + publish</small></button
+            ><span aria-hidden="true">&#8594;</span
+            ><button data-component="redis">
+              04 <b>Redis Streams</b><small>Coordinate jobs</small></button
+            ><span aria-hidden="true">→</span
+            ><button data-component="worker">
+              05 <b>Workers</b><small>Claim + send</small></button
+            ><span aria-hidden="true">→</span
+            ><button data-component="receiver">
+              06 <b>Receiver</b><small>Verify + deduplicate</small>
+            </button>
+          </div>
+          <article
+            class="component-detail"
+            id="component-detail"
+            aria-live="polite"
+          ></article>
+          <div class="decision-grid">
+            <article>
+              <span class="eyebrow">DURABILITY</span>
+              <h3>Why save before queueing?</h3>
+              <p>
+                An accepted event and its delivery records commit together. If
+                Redis is unavailable, PostgreSQL still remembers the work. The
+                dispatcher can publish it later.
+              </p>
+            </article>
+            <article>
+              <span class="eyebrow">DELIVERY SEMANTICS</span>
+              <h3>Why allow duplicates?</h3>
+              <p>
+                A receiver can commit its effect and lose the HTTP response. The
+                sender cannot know that it succeeded. Retrying is necessary;
+                receiver-side idempotency makes repetition safe.
+              </p>
+            </article>
+            <article>
+              <span class="eyebrow">CRASH RECOVERY</span>
+              <h3>Why claim with a lease?</h3>
+              <p>
+                A permanent lock would strand work after a worker crash.
+                Expiring database leases let another worker retry, while
+                ownership tokens stop late completions overwriting newer state.
+              </p>
+            </article>
+            <article>
+              <span class="eyebrow">CONCURRENCY</span>
+              <h3>Why separate Redis connections?</h3>
+              <p>
+                A blocking stream read must not delay acknowledgements or
+                token-bucket checks. Separate connections keep these operations
+                independent.
+              </p>
+            </article>
+          </div>
+          <div class="callout">
+            <strong>A bug found by measuring the whole path.</strong>
+            <p>
+              The first load test found workers acknowledging jobs whose rows
+              were still locked by the dispatcher. Waiting for the specific row
+              fixed the handoff; a real PostgreSQL lock-wait regression test now
+              covers it.
+            </p>
+            <a
+              href="https://github.com/FadyRafat0/RelayForge/blob/main/benchmarks/RESULTS.md"
+              >Read the before/after evidence →</a
+            >
+          </div>
+        </section>
+        <section
+          id="benchmarks-panel"
+          hidden
+          aria-labelledby="benchmarks-title"
+        >
+          <div class="eyebrow">MEASURED, NOT ESTIMATED</div>
+          <h1 id="benchmarks-title">
+            Fast acceptance.<br />Delivery has its own clock.
+          </h1>
+          <p class="lead">
+            A quick HTTP response means the event is saved. It does not mean the
+            webhook has arrived. These local k6 runs measure the two separately.
+          </p>
+          <div class="benchmark-context">
+            <span>1 endpoint</span><span>1 worker · concurrency 4</span
+            ><span>10-second workloads</span
+            ><span>Default dispatcher: 10 jobs / cycle</span>
+          </div>
+          <div class="benchmark-table table-scroll">
+            <table>
+              <thead>
+                <tr>
+                  <th scope="col">WORKLOAD</th>
+                  <th scope="col">DELIVERED</th>
+                  <th scope="col">API P95</th>
+                  <th scope="col">DELIVERY P95</th>
+                </tr>
+              </thead>
+              <tbody id="benchmark-rows"></tbody>
+            </table>
+          </div>
+          <div
+            class="latency-chart"
+            id="latency-chart"
+            aria-label="Delivery p95 latency by offered load"
+          ></div>
+          <div class="decision-grid">
+            <article>
+              <span class="eyebrow">WHAT THE RESULT SHOWS</span>
+              <h3>The dispatcher sets the pace.</h3>
+              <p>
+                At 20 events/sec, the API keeps accepting work quickly while the
+                dispatcher’s ten-job batches create a backlog. All 200
+                deliveries finish, but delivery p95 rises to 9.70 seconds.
+              </p>
+            </article>
+            <article>
+              <span class="eyebrow">WHAT IT DOES NOT SHOW</span>
+              <h3>This is not maximum capacity.</h3>
+              <p>
+                These are short runs on one shared local machine with one small
+                payload and a success-mode receiver. They do not establish
+                steady-state capacity or a production SLO.
+              </p>
+            </article>
+          </div>
+          <div class="callout">
+            <strong>Reproduce the measurement.</strong>
+            <pre><code>npm run benchmark -- --rate 20 --seconds 10</code></pre>
+            <p>
+              Each run provisions its own Docker project, checks delivery and
+              receiver-effect counts, exports JSON, and removes only its own
+              temporary resources.
+            </p>
+            <a
+              href="https://github.com/FadyRafat0/RelayForge/blob/main/benchmarks/RESULTS.md"
+              >Environment, definitions, raw results, and limitations →</a
+            >
+          </div>
+        </section>
+        <footer>
+          <span
+            >RelayForge <span class="footer-separator">/</span> Durable events.
+            Inspectable delivery.</span
+          ><a href="https://github.com/FadyRafat0/RelayForge"
+            >Built with TypeScript, PostgreSQL &amp; Redis ↗</a
+          >
+        </footer>
+      </main>
+    </div>
+    <dialog id="local-dialog" aria-labelledby="local-title">
+      <button class="close" aria-label="Close instructions">×</button
+      ><span class="eyebrow">RUN THE REAL SYSTEM</span>
+      <h2 id="local-title">One command. The full stack.</h2>
+      <p>
+        Clone the repository, open its folder, and start Docker with Linux
+        containers. Then run:
+      </p>
+      <pre><code id="docker-command">docker compose -f compose.demo.yaml up -d --build --wait</code></pre>
+      <button class="primary" id="copy-command">Copy command</button>
+      <p id="copy-status" role="status"></p>
+      <p>
+        The API is available at <code>http://127.0.0.1:3100</code>. This starts
+        PostgreSQL, Redis, the API, dispatcher, worker, and signature-verifying
+        receiver.
+      </p>
+      <a
+        href="https://github.com/FadyRafat0/RelayForge/blob/main/docs/docker-demo.md"
+        >Setup and failure scenarios →</a
+      >
+    </dialog>
+  </body>
+</html>

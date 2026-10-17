@@ -1,0 +1,24 @@
+{
+  "runs": [
+    {
+      "name": "baseline",
+      "rate": 5,
+      "seconds": 10,
+      "expected": 50,
+      "succeeded": 50,
+      "ingestion_p95_ms": 8.084734299999997,
+      "delivery_p95_ms": 952.15135,
+      "source": "benchmarks/results/baseline.json"
+    },
+    {
+      "name": "queued",
+      "rate": 20,
+      "seconds": 10,
+      "expected": 200,
+      "succeeded": 200,
+      "ingestion_p95_ms": 7.508478499999998,
+      "delivery_p95_ms": 9700.970749999999,
+      "source": "benchmarks/results/queued.json"
+    }
+  ]
+}

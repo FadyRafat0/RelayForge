@@ -28,7 +28,9 @@
     "demo:up": "docker compose -f compose.demo.yaml up -d --build --wait",
     "demo:stop": "docker compose -f compose.demo.yaml stop",
     "demo:down": "docker compose -f compose.demo.yaml down",
-    "benchmark": "node benchmarks/run.mjs"
+    "benchmark": "node benchmarks/run.mjs",
+    "showcase": "node scripts/serve-showcase.mjs",
+    "showcase:record": "node scripts/record-showcase.mjs"
   },
   "dependencies": {
     "fastify": "^5.12.7",

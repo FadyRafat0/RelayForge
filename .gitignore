@@ -6,5 +6,6 @@ coverage/
 !.env.example
 *.log
 .npm-cache/
+.tools/
 benchmarks/results/last-run.json
 benchmarks/results/ci-smoke.json
